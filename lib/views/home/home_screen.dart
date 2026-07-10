@@ -6,6 +6,7 @@ import '../../providers/log_provider.dart';
 import '../../models/pet_model.dart';
 import '../../models/daily_log_model.dart';
 import '../profile/profile_screen.dart';
+import '../timeline/timeline_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -57,73 +58,96 @@ class HomeScreen extends StatelessWidget {
 
   // Widget Widget tạo Card cho từng thú cưng
   Widget _buildPetCard(BuildContext context, PetModel pet, PetProvider provider) {
+    // Lấy LogProvider để kiểm tra nhắc lịch
+    final logProvider = Provider.of<LogProvider>(context, listen: false);
+    final medicals = logProvider.getMedicalsForPet(pet.id);
+    
+    // Tìm xem có lịch nhắc nào sắp đến (trong 7 ngày tới) hoặc đã quá hạn không
+    bool hasReminder = false;
+    String reminderText = "";
+    
+    final now = DateTime.now();
+    for (var m in medicals) {
+      final difference = m.nextDueDate.difference(now).inDays;
+      if (difference >= 0 && difference <= 7) {
+        hasReminder = true;
+        reminderText = "Sắp đến hạn ${m.type == 'Vaccine' ? 'tiêm phòng' : 'tẩy giun'} (${difference} ngày)";
+        break;
+      } else if (difference < 0 && !m.isCompleted) {
+         // Nếu quá hạn mà chưa đánh dấu hoàn thành (tính năng mở rộng sau này)
+         hasReminder = true;
+         reminderText = "Quá hạn ${m.type == 'Vaccine' ? 'tiêm phòng' : 'tẩy giun'}!";
+         break;
+      }
+    }
+
     return Card(
       elevation: 4,
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.all(12),
-        // Hiển thị ảnh đại diện (Nếu có path thì lấy từ máy, không thì hiện icon mặc định)
-        leading: pet.imagePath != null && pet.imagePath!.isNotEmpty
-            ? CircleAvatar(
-          radius: 30,
-          backgroundImage: FileImage(File(pet.imagePath!)),
-        )
-            : const CircleAvatar(
-          radius: 30,
-          backgroundColor: Colors.tealAccent,
-          child: Icon(Icons.pets, color: Colors.teal, size: 30),
-        ),
-        title: Text(
-          pet.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
-        ),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text(
-            'Giống: ${pet.breed} • Cân nặng: ${pet.weight} kg',
-            style: TextStyle(color: Colors.grey[700]),
-          ),
-        ),
-        trailing: IconButton(
-          icon: const Icon(Icons.delete, color: Colors.redAccent),
-          onPressed: () {
-            // Hiển thị hộp thoại xác nhận xóa
-            _showDeleteDialog(context, pet, provider);
-          },
-        ),
-        onTap: () async {
-          // Lấy LogProvider mà không cần lắng nghe sự thay đổi UI ở đây (listen: false)
-          final logProvider = Provider.of<LogProvider>(context, listen: false);
-
-          // 1. Thêm một nhật ký giả lập để test
-          final testLog = DailyLogModel(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
-            petId: pet.id,
-            dateTime: DateTime.now(),
-            logType: 'Food',
-            title: 'Test: Bé đã ăn hạt',
-            note: 'Ăn lúc ${DateTime.now().hour}:${DateTime.now().minute}',
-          );
-
-          await logProvider.addLog(testLog);
-
-          // 2. Lấy danh sách nhật ký của riêng bé này ra Console để kiểm tra
-          final petLogs = logProvider.getLogsForPet(pet.id);
-          print("--- NHẬT KÝ CỦA BÉ ${pet.name.toUpperCase()} ---");
-          print("Tổng số bản ghi: ${petLogs.length}");
-          for (var log in petLogs) {
-            print(">> [${log.dateTime}] ${log.title} - ${log.note}");
-          }
-
-          // 3. Thông báo cho người dùng
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Đã thêm 1 nhật ký cho ${pet.name}. Kiểm tra Console!'),
-              duration: const Duration(seconds: 2),
+      child: Column(
+        children: [
+          ListTile(
+            contentPadding: const EdgeInsets.all(12),
+            leading: pet.imagePath != null && pet.imagePath!.isNotEmpty
+                ? CircleAvatar(
+              radius: 30,
+              backgroundImage: FileImage(File(pet.imagePath!)),
+            )
+                : const CircleAvatar(
+              radius: 30,
+              backgroundColor: Colors.tealAccent,
+              child: Icon(Icons.pets, color: Colors.teal, size: 30),
             ),
-          );
-        },
+            title: Text(
+              pet.name,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+            ),
+            subtitle: Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(
+                'Giống: ${pet.breed} • Cân nặng: ${pet.weight} kg',
+                style: TextStyle(color: Colors.grey[700]),
+              ),
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.delete, color: Colors.redAccent),
+              onPressed: () {
+                _showDeleteDialog(context, pet, provider);
+              },
+            ),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => TimelineScreen(petId: pet.id),
+                ),
+              );
+            },
+          ),
+          if (hasReminder)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+              decoration: BoxDecoration(
+                color: Colors.orange[100],
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(12),
+                  bottomRight: Radius.circular(12),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.notification_important, color: Colors.orange, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    reminderText,
+                    style: const TextStyle(color: Colors.deepOrange, fontWeight: FontWeight.w500, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
