@@ -2,7 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/pet_provider.dart';
+import '../../providers/log_provider.dart';
 import '../../models/pet_model.dart';
+import '../../models/daily_log_model.dart';
 import '../profile/profile_screen.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -90,9 +92,37 @@ class HomeScreen extends StatelessWidget {
             _showDeleteDialog(context, pet, provider);
           },
         ),
-        onTap: () {
-          // TODO: Chuyển hướng sang màn hình Nhật ký Timeline của riêng bé này
-          // Truyền pet.id sang màn hình đó để lọc nhật ký
+        onTap: () async {
+          // Lấy LogProvider mà không cần lắng nghe sự thay đổi UI ở đây (listen: false)
+          final logProvider = Provider.of<LogProvider>(context, listen: false);
+
+          // 1. Thêm một nhật ký giả lập để test
+          final testLog = DailyLogModel(
+            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            petId: pet.id,
+            dateTime: DateTime.now(),
+            logType: 'Food',
+            title: 'Test: Bé đã ăn hạt',
+            note: 'Ăn lúc ${DateTime.now().hour}:${DateTime.now().minute}',
+          );
+
+          await logProvider.addLog(testLog);
+
+          // 2. Lấy danh sách nhật ký của riêng bé này ra Console để kiểm tra
+          final petLogs = logProvider.getLogsForPet(pet.id);
+          print("--- NHẬT KÝ CỦA BÉ ${pet.name.toUpperCase()} ---");
+          print("Tổng số bản ghi: ${petLogs.length}");
+          for (var log in petLogs) {
+            print(">> [${log.dateTime}] ${log.title} - ${log.note}");
+          }
+
+          // 3. Thông báo cho người dùng
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Đã thêm 1 nhật ký cho ${pet.name}. Kiểm tra Console!'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
         },
       ),
     );

@@ -4,7 +4,6 @@ part 'daily_log_model.g.dart';
 
 @HiveType(typeId: 1)
 class DailyLogModel extends HiveObject{
-@HiveType(typeId: 3)
   @HiveField(0)
   final String id;
 

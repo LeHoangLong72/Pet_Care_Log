@@ -4,6 +4,7 @@ import 'package:pet_care_log/models/daily_log_model.dart';
 import 'package:pet_care_log/models/medical_model.dart';
 import 'package:pet_care_log/models/pet_model.dart';
 import 'package:pet_care_log/providers/pet_provider.dart';
+import 'package:pet_care_log/providers/log_provider.dart';
 import 'package:pet_care_log/views/home/home_screen.dart';
 import 'package:provider/provider.dart';
 
@@ -37,6 +38,7 @@ class MyApp extends StatelessWidget {
         providers: [
           // Khởi tạo các Provider quản lý State tại đây
           ChangeNotifierProvider(create: (_) => PetProvider()),
+          ChangeNotifierProvider(create: (_) => LogProvider()),
         ],
       child: MaterialApp(
         title: 'PetCareLog',
