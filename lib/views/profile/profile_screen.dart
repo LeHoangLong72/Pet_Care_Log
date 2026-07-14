@@ -5,10 +5,12 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/pet_model.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/pet_provider.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final PetModel? pet;
+  const ProfileScreen({super.key, this.pet});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -16,15 +18,34 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen>{
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
-  final _breedController = TextEditingController();
-  final _weightController = TextEditingController();
+  late TextEditingController _nameController;
+  late TextEditingController _breedController;
+  late TextEditingController _weightController;
 
   DateTime? _selectedDate;
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
 
-  // Hàm chọn ảnh từ thư viện
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.pet?.name ?? '');
+    _breedController = TextEditingController(text: widget.pet?.breed ?? '');
+    _weightController = TextEditingController(text: widget.pet?.weight.toString() ?? '');
+    _selectedDate = widget.pet?.birthDate;
+    if (widget.pet?.imagePath != null) {
+      _imageFile = File(widget.pet!.imagePath!);
+    }
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _breedController.dispose();
+    _weightController.dispose();
+    super.dispose();
+  }
+
   Future<void> _pickImage() async {
     final pickedFile = await _picker.pickImage(source: ImageSource.gallery);
     if (pickedFile != null){
@@ -34,11 +55,10 @@ class _ProfileScreenState extends State<ProfileScreen>{
     }
   }
 
-  // Hàm chọn ngày sinh
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
         context: context,
-        initialDate: DateTime.now(),
+        initialDate: _selectedDate ?? DateTime.now(),
         firstDate: DateTime(2000),
         lastDate: DateTime.now(),
     );
@@ -49,22 +69,35 @@ class _ProfileScreenState extends State<ProfileScreen>{
     }
   }
 
-  // Hàm lưu dữ liệu
   void _savePet(){
     if (_formKey.currentState!.validate() && _selectedDate != null){
       final petProvider = Provider.of<PetProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final userId = authProvider.user?.uid;
 
-      final newPet = PetModel(
-        id: const Uuid().v4(), // Tạo ID duy nhất
-        name: _nameController.text,
-        breed: _breedController.text,
-        birthDate: _selectedDate!,
-        weight: double.tryParse(_weightController.text) ?? 0.0,
-        imagePath: _imageFile?.path,
-      );
+      if (userId == null) return;
 
-      petProvider.addPet(newPet);
-      Navigator.pop(context); // Quay lại màn hình chính
+      if (widget.pet == null) {
+        final newPet = PetModel(
+          id: const Uuid().v4(),
+          ownerId: userId, // Gán ownerId từ user hiện tại
+          name: _nameController.text,
+          breed: _breedController.text,
+          birthDate: _selectedDate!,
+          weight: double.tryParse(_weightController.text) ?? 0.0,
+          imagePath: _imageFile?.path,
+        );
+        petProvider.addPet(newPet);
+      } else {
+        widget.pet!.name = _nameController.text;
+        widget.pet!.breed = _breedController.text;
+        widget.pet!.birthDate = _selectedDate!;
+        widget.pet!.weight = double.tryParse(_weightController.text) ?? 0.0;
+        widget.pet!.imagePath = _imageFile?.path;
+        petProvider.updatePet(widget.pet!);
+      }
+      
+      Navigator.pop(context);
     } else if (_selectedDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng chọn ngày sinh')),
@@ -76,7 +109,7 @@ class _ProfileScreenState extends State<ProfileScreen>{
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Thêm Thú Cưng'),
+        title: Text(widget.pet == null ? 'Thêm Thú Cưng' : 'Sửa Hồ Sơ'),
         backgroundColor: Colors.teal,
         foregroundColor: Colors.white,
       ),
@@ -86,14 +119,13 @@ class _ProfileScreenState extends State<ProfileScreen>{
           key: _formKey,
           child: Column(
             children: [
-              // Khu vực chọn ảnh đại diện
               GestureDetector(
                 onTap: _pickImage,
                 child: CircleAvatar(
                   radius: 50,
                   backgroundColor: Colors.teal[50],
-                  backgroundImage: _imageFile != null ? FileImage(_imageFile!) : null,
-                  child: _imageFile == null
+                  backgroundImage: _imageFile != null && _imageFile!.existsSync() ? FileImage(_imageFile!) : null,
+                  child: (_imageFile == null || !_imageFile!.existsSync())
                       ? const Icon(Icons.camera_alt, size: 40, color: Colors.teal)
                       : null,
                 ),
@@ -130,7 +162,6 @@ class _ProfileScreenState extends State<ProfileScreen>{
                 validator: (value) => value!.isEmpty ? 'Vui lòng nhập cân nặng' : null,
               ),
               const SizedBox(height: 15),
-              // Chọn ngày sinh
               ListTile(
                 tileColor: Colors.grey[100],
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),

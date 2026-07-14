@@ -1,52 +1,72 @@
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import 'package:pet_care_log/models/daily_log_model.dart';
-import 'package:pet_care_log/models/medical_model.dart';
-import 'package:pet_care_log/models/pet_model.dart';
+import 'package:pet_care_log/providers/auth_provider.dart' as custom_auth;
 import 'package:pet_care_log/providers/pet_provider.dart';
 import 'package:pet_care_log/providers/log_provider.dart';
+import 'package:pet_care_log/views/auth/login_screen.dart';
 import 'package:pet_care_log/views/home/home_screen.dart';
 import 'package:provider/provider.dart';
+import 'firebase_options.dart';
 
-
-void main() async{
-  // Đảm bảo các dịch vụ native của Flutter đã sẵn sàng
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
+  // Tắt xác thực App để tránh bị treo reCAPTCHA trên máy ảo
+  // (Chỉ hoạt động trên Android/iOS)
+  try {
+    await FirebaseAuth.instance.setSettings(appVerificationDisabledForTesting: true);
+  } catch (e) {
+    debugPrint("Lỗi cấu hình xác thực: $e");
+  }
 
-  // Khởi tạo Hive
-  await Hive.initFlutter();
-
-  // Đăng ký các Adapter để Hive đọc được dữ liệu Custom Object
-  Hive.registerAdapter(PetModelAdapter());
-  Hive.registerAdapter(DailyLogModelAdapter());
-  Hive.registerAdapter(MedicalModelAdapter());
-
-  // Mở sẵn các Box dữ liệu (Tương tự như mở các bảng trong SQL)
-  await Hive.openBox<PetModel>('pets_box');
-  await Hive.openBox<DailyLogModel>('logs_box');
-  await Hive.openBox<MedicalModel>('medicals_box');
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-        providers: [
-          // Khởi tạo các Provider quản lý State tại đây
-          ChangeNotifierProvider(create: (_) => PetProvider()),
-          ChangeNotifierProvider(create: (_) => LogProvider()),
-        ],
+      providers: [
+        ChangeNotifierProvider(create: (_) => custom_auth.AuthProvider()),
+        ChangeNotifierProxyProvider<custom_auth.AuthProvider, PetProvider>(
+          create: (_) => PetProvider(),
+          update: (_, auth, petProvider) => petProvider!..updateUserId(auth.user?.uid),
+        ),
+        ChangeNotifierProxyProvider<custom_auth.AuthProvider, LogProvider>(
+          create: (_) => LogProvider(),
+          update: (_, auth, logProvider) => logProvider!..updateUserId(auth.user?.uid),
+        ),
+      ],
       child: MaterialApp(
         title: 'PetCareLog',
-        theme: ThemeData(primarySwatch: Colors.teal, useMaterial3: true),
-        home:  const HomeScreen(),
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+          useMaterial3: true,
+        ),
+        home: const AuthWrapper(),
       ),
     );
   }
 }
 
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
 
+  @override
+  Widget build(BuildContext context) {
+    final authProvider = Provider.of<custom_auth.AuthProvider>(context);
+    
+    if (authProvider.isAuthenticated) {
+      return const HomeScreen();
+    } else {
+      return const LoginScreen();
+    }
+  }
+}

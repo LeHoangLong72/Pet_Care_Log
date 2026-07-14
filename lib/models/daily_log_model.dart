@@ -1,33 +1,44 @@
-import 'package:hive/hive.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-part 'daily_log_model.g.dart';
-
-@HiveType(typeId: 1)
-class DailyLogModel extends HiveObject{
-  @HiveField(0)
+class DailyLogModel {
   final String id;
-
-  @HiveField(1)
-  final String petId; // Khóa ngoại liên kết với PetModel
-
-  @HiveField(2)
+  final String petId;
+  final String ownerId; // Thêm ownerId
   final DateTime dateTime;
-
-  @HiveField(3)
-  final String logType; // 'Food', 'Waste', hoặc 'Symptom' để đơn giản hóa Enum
-
-  @HiveField(4)
-  String title; // V dụ: "Ăn hạt Royal Canin", "Đi bậy ngoài thảm"
-
-  @HiveField(5)
-  String note; // Chi tiết: "Ăn hết 50g", "Phân hơi lỏng"
+  final String logType;
+  String title;
+  String note;
 
   DailyLogModel({
     required this.id,
     required this.petId,
+    required this.ownerId,
     required this.dateTime,
     required this.logType,
     required this.title,
-    required this.note
+    required this.note,
   });
+
+  factory DailyLogModel.fromMap(Map<String, dynamic> map, String documentId) {
+    return DailyLogModel(
+      id: documentId,
+      petId: map['petId'] ?? '',
+      ownerId: map['ownerId'] ?? '',
+      dateTime: (map['dateTime'] as Timestamp).toDate(),
+      logType: map['logType'] ?? 'Food',
+      title: map['title'] ?? '',
+      note: map['note'] ?? '',
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'petId': petId,
+      'ownerId': ownerId,
+      'dateTime': Timestamp.fromDate(dateTime),
+      'logType': logType,
+      'title': title,
+      'note': note,
+    };
+  }
 }

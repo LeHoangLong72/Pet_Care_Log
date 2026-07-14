@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/daily_log_model.dart';
 import '../../models/medical_model.dart';
+import '../../models/pet_model.dart';
 import '../../providers/log_provider.dart';
 import '../../providers/pet_provider.dart';
 
@@ -14,6 +15,7 @@ class TimelineScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Lấy thông tin Pet để có ownerId
     final pet = Provider.of<PetProvider>(context).pets.firstWhere((p) => p.id == petId);
 
     return DefaultTabController(
@@ -35,8 +37,8 @@ class TimelineScreen extends StatelessWidget {
         ),
         body: TabBarView(
           children: [
-            _DailyLogTab(petId: petId),
-            _MedicalTab(petId: petId),
+            _DailyLogTab(pet: pet),
+            _MedicalTab(pet: pet),
           ],
         ),
       ),
@@ -46,13 +48,13 @@ class TimelineScreen extends StatelessWidget {
 
 // --- TAB NHẬT KÝ HÀNG NGÀY ---
 class _DailyLogTab extends StatelessWidget {
-  final String petId;
-  const _DailyLogTab({required this.petId});
+  final PetModel pet;
+  const _DailyLogTab({required this.pet});
 
   @override
   Widget build(BuildContext context) {
     final logProvider = Provider.of<LogProvider>(context);
-    final logs = logProvider.getLogsForPet(petId);
+    final logs = logProvider.getLogsForPet(pet.id);
 
     return Scaffold(
       body: logs.isEmpty
@@ -60,7 +62,7 @@ class _DailyLogTab extends StatelessWidget {
           : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: logs.length,
-              itemBuilder: (context, index) => _buildTimelineItem(logs[index]),
+              itemBuilder: (context, index) => _buildTimelineItem(context, logs[index]),
             ),
       floatingActionButton: FloatingActionButton(
         heroTag: 'add_log',
@@ -71,7 +73,7 @@ class _DailyLogTab extends StatelessWidget {
     );
   }
 
-  Widget _buildTimelineItem(DailyLogModel log) {
+  Widget _buildTimelineItem(BuildContext context, DailyLogModel log) {
     IconData icon;
     Color color;
 
@@ -107,13 +109,69 @@ class _DailyLogTab extends StatelessWidget {
           Expanded(
             child: Card(
               margin: const EdgeInsets.symmetric(vertical: 6),
-              child: ListTile(
-                title: Text(log.title, style: const TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: Text(log.note),
-                trailing: Text(DateFormat('HH:mm\ndd/MM').format(log.dateTime),
-                    textAlign: TextAlign.right, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            log.title,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            log.note,
+                            style: TextStyle(color: Colors.grey[800]),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          DateFormat('HH:mm\ndd/MM').format(log.dateTime),
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                        const SizedBox(height: 8),
+                        IconButton(
+                          constraints: const BoxConstraints(),
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
+                          onPressed: () => _showDeleteLogConfirm(context, log),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteLogConfirm(BuildContext context, DailyLogModel log) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xóa nhật ký?'),
+        content: const Text('Bạn có chắc muốn xóa dòng nhật ký này không?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(
+            onPressed: () {
+              Provider.of<LogProvider>(context, listen: false).deleteLog(log.id);
+              Navigator.pop(context);
+            },
+            child: const Text('Xóa', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -155,7 +213,8 @@ class _DailyLogTab extends StatelessWidget {
                   if (titleController.text.isNotEmpty) {
                     provider.addLog(DailyLogModel(
                       id: const Uuid().v4(),
-                      petId: petId,
+                      petId: pet.id,
+                      ownerId: pet.ownerId, // Thêm ownerId từ PetModel
                       dateTime: DateTime.now(),
                       logType: selectedType,
                       title: titleController.text,
@@ -178,13 +237,13 @@ class _DailyLogTab extends StatelessWidget {
 
 // --- TAB Y TẾ (VACCINE & TẨY GIUN) ---
 class _MedicalTab extends StatelessWidget {
-  final String petId;
-  const _MedicalTab({required this.petId});
+  final PetModel pet;
+  const _MedicalTab({required this.pet});
 
   @override
   Widget build(BuildContext context) {
     final logProvider = Provider.of<LogProvider>(context);
-    final medicals = logProvider.getMedicalsForPet(petId);
+    final medicals = logProvider.getMedicalsForPet(pet.id);
 
     return Scaffold(
       body: medicals.isEmpty
@@ -195,12 +254,54 @@ class _MedicalTab extends StatelessWidget {
               itemBuilder: (context, index) {
                 final m = medicals[index];
                 return Card(
-                  child: ListTile(
-                    leading: Icon(m.type == 'Vaccine' ? Icons.vaccines : Icons.bug_report,
-                        color: m.isCompleted ? Colors.green : Colors.orange),
-                    title: Text('${m.type == 'Vaccine' ? 'Tiêm phòng' : 'Tẩy giun'}'),
-                    subtitle: Text('Ngày thực hiện: ${DateFormat('dd/MM/yyyy').format(m.dateAdministered)}\nHẹn tiếp theo: ${DateFormat('dd/MM/yyyy').format(m.nextDueDate)}'),
-                    trailing: m.isCompleted ? const Icon(Icons.check_circle, color: Colors.green) : const Icon(Icons.pending, color: Colors.orange),
+                  margin: const EdgeInsets.symmetric(vertical: 6),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                            m.type == 'Vaccine' ? Icons.vaccines : Icons.bug_report,
+                            color: m.isCompleted ? Colors.green : Colors.orange),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                m.type == 'Vaccine' ? 'Tiêm phòng' : 'Tẩy giun',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Ngày: ${DateFormat('dd/MM/yyyy').format(m.dateAdministered)}\nHẹn: ${DateFormat('dd/MM/yyyy').format(m.nextDueDate)}',
+                                style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Column(
+                          children: [
+                            if (!m.isCompleted)
+                              IconButton(
+                                constraints: const BoxConstraints(),
+                                padding: const EdgeInsets.only(bottom: 8),
+                                icon: const Icon(Icons.check_circle_outline, color: Colors.orange),
+                                onPressed: () {
+                                  m.isCompleted = true;
+                                  logProvider.updateMedicalStatus(m);
+                                },
+                              ),
+                            IconButton(
+                              constraints: const BoxConstraints(),
+                              padding: EdgeInsets.zero,
+                              icon: const Icon(Icons.delete_sweep, color: Colors.redAccent),
+                              onPressed: () => _showDeleteMedicalConfirm(context, m),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -214,26 +315,41 @@ class _MedicalTab extends StatelessWidget {
     );
   }
 
+  void _showDeleteMedicalConfirm(BuildContext context, MedicalModel medical) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xóa bản ghi y tế?'),
+        content: const Text('Dữ liệu tiêm phòng này sẽ bị xóa vĩnh viễn.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+          TextButton(
+            onPressed: () {
+              Provider.of<LogProvider>(context, listen: false).deleteMedical(medical.id);
+              Navigator.pop(context);
+            },
+            child: const Text('Xóa', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showAddMedicalDialog(BuildContext context, LogProvider provider) {
     String selectedType = 'Vaccine';
     DateTime adminDate = DateTime.now();
-    DateTime nextDate = DateTime.now().add(const Duration(days: 365)); // Mặc định 1 năm
+    DateTime nextDate = DateTime.now().add(const Duration(days: 365));
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Padding(
-          padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom,
-              left: 16,
-              right: 16,
-              top: 16),
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 16, right: 16, top: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Thêm bản ghi y tế',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text('Thêm bản ghi y tế', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 15),
               DropdownButtonFormField<String>(
                 value: selectedType,
@@ -244,7 +360,6 @@ class _MedicalTab extends StatelessWidget {
                 onChanged: (val) {
                   setModalState(() {
                     selectedType = val!;
-                    // Tự động gợi ý ngày tiếp theo: Vaccine +1 năm, Tẩy giun +3 tháng
                     if (selectedType == 'Vaccine') {
                       nextDate = adminDate.add(const Duration(days: 365));
                     } else {
@@ -252,8 +367,7 @@ class _MedicalTab extends StatelessWidget {
                     }
                   });
                 },
-                decoration: const InputDecoration(
-                    border: OutlineInputBorder(), labelText: 'Loại dịch vụ'),
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Loại dịch vụ'),
               ),
               const SizedBox(height: 10),
               ListTile(
@@ -293,19 +407,19 @@ class _MedicalTab extends StatelessWidget {
                 onPressed: () {
                   provider.addMedical(MedicalModel(
                     id: const Uuid().v4(),
-                    petId: petId,
+                    petId: pet.id,
+                    ownerId: pet.ownerId, // Thêm ownerId từ PetModel
                     type: selectedType,
                     dateAdministered: adminDate,
                     nextDueDate: nextDate,
-                    isCompleted: true,
+                    isCompleted: adminDate.day == DateTime.now().day && 
+                               adminDate.month == DateTime.now().month &&
+                               adminDate.year == DateTime.now().year,
                   ));
                   Navigator.pop(context);
                 },
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.teal,
-                    minimumSize: const Size(double.infinity, 45)),
-                child: const Text('LƯU THÔNG TIN',
-                    style: TextStyle(color: Colors.white)),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.teal, minimumSize: const Size(double.infinity, 45)),
+                child: const Text('LƯU THÔNG TIN', style: TextStyle(color: Colors.white)),
               ),
               const SizedBox(height: 20),
             ],

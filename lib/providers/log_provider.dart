@@ -1,53 +1,88 @@
+import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
-import 'package:hive/hive.dart';
 import '../models/daily_log_model.dart';
 import '../models/medical_model.dart';
 
 class LogProvider extends ChangeNotifier {
-  final Box<DailyLogModel> _logBox = Hive.box<DailyLogModel>('logs_box');
-  final Box<MedicalModel> _medicalBox = Hive.box<MedicalModel>('medicals_box');
+  final FirebaseFirestore _db = FirebaseFirestore.instance;
+
+  List<DailyLogModel> _allLogs = [];
+  List<MedicalModel> _allMedicals = [];
+  
+  StreamSubscription? _logSub;
+  StreamSubscription? _medicalSub;
+
+  void updateUserId(String? userId) {
+    _logSub?.cancel();
+    _medicalSub?.cancel();
+    
+    if (userId == null) {
+      _allLogs = [];
+      _allMedicals = [];
+      notifyListeners();
+      return;
+    }
+
+    _logSub = _db.collection('logs')
+        .where('ownerId', isEqualTo: userId)
+        .snapshots().listen((snapshot) {
+      _allLogs = snapshot.docs
+          .map((doc) => DailyLogModel.fromMap(doc.data(), doc.id))
+          .toList();
+      notifyListeners();
+    });
+
+    _medicalSub = _db.collection('medicals')
+        .where('ownerId', isEqualTo: userId)
+        .snapshots().listen((snapshot) {
+      _allMedicals = snapshot.docs
+          .map((doc) => MedicalModel.fromMap(doc.data(), doc.id))
+          .toList();
+      notifyListeners();
+    });
+  }
 
   // --- PHẦN NHẬT KÝ HÀNG NGÀY (DAILY LOG) ---
 
-  // Lấy nhật ký của một thú cưng cụ thể, sắp xếp theo thời gian mới nhất lên đầu
   List<DailyLogModel> getLogsForPet(String petId) {
-    return _logBox.values
-        .where((log) => log.petId == petId)
-        .toList()
+    return _allLogs.where((log) => log.petId == petId).toList()
       ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
   }
 
-  // Thêm nhật ký mới
   Future<void> addLog(DailyLogModel log) async {
-    await _logBox.put(log.id, log);
-    notifyListeners();
+    await _db.collection('logs').doc(log.id).set(log.toMap());
   }
 
-  // Xóa nhật ký
   Future<void> deleteLog(String logId) async {
-    await _logBox.delete(logId);
-    notifyListeners();
+    await _db.collection('logs').doc(logId).delete();
   }
 
   // --- PHẦN Y TẾ (MEDICAL) ---
 
-  // Lấy danh sách tiêm phòng/tẩy giun của một thú cưng
   List<MedicalModel> getMedicalsForPet(String petId) {
-    return _medicalBox.values
-        .where((m) => m.petId == petId)
-        .toList()
+    return _allMedicals.where((m) => m.petId == petId).toList()
       ..sort((a, b) => b.dateAdministered.compareTo(a.dateAdministered));
   }
 
-  // Thêm bản ghi y tế
   Future<void> addMedical(MedicalModel medical) async {
-    await _medicalBox.put(medical.id, medical);
-    notifyListeners();
+    await _db.collection('medicals').doc(medical.id).set(medical.toMap());
   }
 
-  // Cập nhật trạng thái đã hoàn thành (Ví dụ: đã tiêm xong)
   Future<void> updateMedicalStatus(MedicalModel medical) async {
-    await medical.save();
-    notifyListeners();
+    await _db.collection('medicals').doc(medical.id).update({
+      'isCompleted': medical.isCompleted,
+    });
+  }
+
+  Future<void> deleteMedical(String medicalId) async {
+    await _db.collection('medicals').doc(medicalId).delete();
+  }
+
+  @override
+  void dispose() {
+    _logSub?.cancel();
+    _medicalSub?.cancel();
+    super.dispose();
   }
 }

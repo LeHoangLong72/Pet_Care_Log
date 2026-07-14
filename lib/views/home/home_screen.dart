@@ -1,10 +1,10 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/pet_provider.dart';
 import '../../providers/log_provider.dart';
 import '../../models/pet_model.dart';
-import '../../models/daily_log_model.dart';
 import '../profile/profile_screen.dart';
 import '../timeline/timeline_screen.dart';
 
@@ -13,9 +13,9 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Lắng nghe sự thay đổi dữ liệu từ PetProvider
     final petProvider = Provider.of<PetProvider>(context);
-    final petList = petProvider.pets; // Lấy danh sách thú cưng từ Hive
+    final petList = petProvider.pets;
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
     return Scaffold(
       appBar: AppBar(
@@ -25,26 +25,31 @@ class HomeScreen extends StatelessWidget {
         ),
         centerTitle: true,
         backgroundColor: Colors.teal,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            onPressed: () => authProvider.signOut(),
+          ),
+        ],
       ),
       body: petList.isEmpty
           ? const Center(
-        child: Text(
-          'Chưa có thú cưng nào.\nHãy bấm nút (+) để thêm mới!',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 16, color: Colors.grey),
-        ),
-      )
+              child: Text(
+                'Chưa có thú cưng nào.\nHãy bấm nút (+) để thêm mới!',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+            )
           : ListView.builder(
-        padding: const EdgeInsets.all(12),
-        itemCount: petList.length,
-        itemBuilder: (context, index) {
-          final pet = petList[index];
-          return _buildPetCard(context, pet, petProvider);
-        },
-      ),
+              padding: const EdgeInsets.all(12),
+              itemCount: petList.length,
+              itemBuilder: (context, index) {
+                final pet = petList[index];
+                return _buildPetCard(context, pet, petProvider);
+              },
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          // Thay thế nội dung bên trong onPressed bằng lệnh chuyển trang dưới đây:
           Navigator.push(
             context,
             MaterialPageRoute(builder: (context) => const ProfileScreen()),
@@ -56,13 +61,10 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Widget Widget tạo Card cho từng thú cưng
   Widget _buildPetCard(BuildContext context, PetModel pet, PetProvider provider) {
-    // Lấy LogProvider để kiểm tra nhắc lịch
     final logProvider = Provider.of<LogProvider>(context, listen: false);
     final medicals = logProvider.getMedicalsForPet(pet.id);
     
-    // Tìm xem có lịch nhắc nào sắp đến (trong 7 ngày tới) hoặc đã quá hạn không
     bool hasReminder = false;
     String reminderText = "";
     
@@ -71,10 +73,9 @@ class HomeScreen extends StatelessWidget {
       final difference = m.nextDueDate.difference(now).inDays;
       if (difference >= 0 && difference <= 7) {
         hasReminder = true;
-        reminderText = "Sắp đến hạn ${m.type == 'Vaccine' ? 'tiêm phòng' : 'tẩy giun'} (${difference} ngày)";
+        reminderText = "Sắp đến hạn ${m.type == 'Vaccine' ? 'tiêm phòng' : 'tẩy giun'} ($difference ngày)";
         break;
       } else if (difference < 0 && !m.isCompleted) {
-         // Nếu quá hạn mà chưa đánh dấu hoàn thành (tính năng mở rộng sau này)
          hasReminder = true;
          reminderText = "Quá hạn ${m.type == 'Vaccine' ? 'tiêm phòng' : 'tẩy giun'}!";
          break;
@@ -89,32 +90,70 @@ class HomeScreen extends StatelessWidget {
         children: [
           ListTile(
             contentPadding: const EdgeInsets.all(12),
-            leading: pet.imagePath != null && pet.imagePath!.isNotEmpty
+            leading: pet.imagePath != null && pet.imagePath!.isNotEmpty && File(pet.imagePath!).existsSync()
                 ? CircleAvatar(
-              radius: 30,
-              backgroundImage: FileImage(File(pet.imagePath!)),
-            )
+                    radius: 30,
+                    backgroundImage: FileImage(File(pet.imagePath!)),
+                  )
                 : const CircleAvatar(
-              radius: 30,
-              backgroundColor: Colors.tealAccent,
-              child: Icon(Icons.pets, color: Colors.teal, size: 30),
-            ),
+                    radius: 30,
+                    backgroundColor: Colors.tealAccent,
+                    child: Icon(Icons.pets, color: Colors.teal, size: 30),
+                  ),
             title: Text(
               pet.name,
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             subtitle: Padding(
               padding: const EdgeInsets.only(top: 6),
-              child: Text(
-                'Giống: ${pet.breed} • Cân nặng: ${pet.weight} kg',
-                style: TextStyle(color: Colors.grey[700]),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Giống: ${pet.breed} • ${pet.weight} kg',
+                    style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.history, size: 14, color: Colors.teal[300]),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          logProvider.getLogsForPet(pet.id).isNotEmpty
+                              ? 'Cuối: ${logProvider.getLogsForPet(pet.id).first.title}'
+                              : 'Chưa có hoạt động',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            trailing: IconButton(
-              icon: const Icon(Icons.delete, color: Colors.redAccent),
-              onPressed: () {
-                _showDeleteDialog(context, pet, provider);
-              },
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Colors.teal),
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ProfileScreen(pet: pet),
+                      ),
+                    );
+                  },
+                ),
+                IconButton(
+                  icon: const Icon(Icons.delete, color: Colors.redAccent),
+                  onPressed: () {
+                    _showDeleteDialog(context, pet, provider);
+                  },
+                ),
+              ],
             ),
             onTap: () {
               Navigator.push(
@@ -152,7 +191,6 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // Hộp thoại xác nhận xóa thú cưng khỏi Hive
   void _showDeleteDialog(BuildContext context, PetModel pet, PetProvider provider) {
     showDialog(
       context: context,
@@ -167,7 +205,7 @@ class HomeScreen extends StatelessWidget {
             ),
             TextButton(
               onPressed: () {
-                provider.deletePet(pet.id); // Gọi hàm xóa từ Provider
+                provider.deletePet(pet.id);
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Đã xóa hồ sơ của ${pet.name}')),
