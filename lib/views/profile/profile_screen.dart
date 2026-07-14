@@ -69,38 +69,60 @@ class _ProfileScreenState extends State<ProfileScreen>{
     }
   }
 
-  void _savePet(){
-    if (_formKey.currentState!.validate() && _selectedDate != null){
-      final petProvider = Provider.of<PetProvider>(context, listen: false);
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      final userId = authProvider.user?.uid;
+  void _savePet() {
+    try {
+      if (_formKey.currentState!.validate() && _selectedDate != null) {
+        final petProvider = Provider.of<PetProvider>(context, listen: false);
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final userId = authProvider.user?.uid;
 
-      if (userId == null) return;
+        if (userId == null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Lỗi: Bạn cần đăng nhập để thực hiện thao tác này')),
+          );
+          return;
+        }
 
-      if (widget.pet == null) {
-        final newPet = PetModel(
-          id: const Uuid().v4(),
-          ownerId: userId, // Gán ownerId từ user hiện tại
-          name: _nameController.text,
-          breed: _breedController.text,
-          birthDate: _selectedDate!,
-          weight: double.tryParse(_weightController.text) ?? 0.0,
-          imagePath: _imageFile?.path,
+        final weight = double.tryParse(_weightController.text) ?? 0.0;
+
+        if (widget.pet == null) {
+          final newPet = PetModel(
+            id: const Uuid().v4(),
+            ownerId: userId,
+            name: _nameController.text.trim(),
+            breed: _breedController.text.trim(),
+            birthDate: _selectedDate!,
+            weight: weight,
+            imagePath: _imageFile?.path,
+          );
+          petProvider.addPet(newPet);
+        } else {
+          widget.pet!.name = _nameController.text.trim();
+          widget.pet!.breed = _breedController.text.trim();
+          widget.pet!.birthDate = _selectedDate!;
+          widget.pet!.weight = weight;
+          widget.pet!.imagePath = _imageFile?.path;
+          petProvider.updatePet(widget.pet!);
+        }
+
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Đã lưu thông tin thú cưng thành công!')),
         );
-        petProvider.addPet(newPet);
-      } else {
-        widget.pet!.name = _nameController.text;
-        widget.pet!.breed = _breedController.text;
-        widget.pet!.birthDate = _selectedDate!;
-        widget.pet!.weight = double.tryParse(_weightController.text) ?? 0.0;
-        widget.pet!.imagePath = _imageFile?.path;
-        petProvider.updatePet(widget.pet!);
+      } else if (_selectedDate == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Vui lòng chọn ngày sinh'),
+            backgroundColor: Colors.orange,
+          ),
+        );
       }
-      
-      Navigator.pop(context);
-    } else if (_selectedDate == null) {
+    } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Vui lòng chọn ngày sinh')),
+        SnackBar(
+          content: Text('Đã có lỗi xảy ra: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -158,8 +180,20 @@ class _ProfileScreenState extends State<ProfileScreen>{
                   border: OutlineInputBorder(),
                   prefixIcon: Icon(Icons.monitor_weight),
                 ),
-                keyboardType: TextInputType.number,
-                validator: (value) => value!.isEmpty ? 'Vui lòng nhập cân nặng' : null,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Vui lòng nhập cân nặng';
+                  }
+                  final weight = double.tryParse(value);
+                  if (weight == null) {
+                    return 'Cân nặng phải là một con số';
+                  }
+                  if (weight <= 0) {
+                    return 'Cân nặng phải lớn hơn 0';
+                  }
+                  return null;
+                },
               ),
               const SizedBox(height: 15),
               ListTile(
