@@ -22,16 +22,20 @@ class TimelineScreen extends StatelessWidget {
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: Text('Hồ sơ bé ${pet.name}'),
-          backgroundColor: Colors.teal,
-          foregroundColor: Colors.white,
-          bottom: const TabBar(
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            indicatorColor: Colors.white,
-            tabs: [
-              Tab(icon: Icon(Icons.history), text: 'Nhật ký'),
-              Tab(icon: Icon(Icons.medical_services), text: 'Y tế'),
+          title: Column(
+            children: [
+              Text(pet.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+              Text(pet.breed, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.outline)),
+            ],
+          ),
+          bottom: TabBar(
+            labelColor: Theme.of(context).colorScheme.primary,
+            unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+            indicatorSize: TabBarIndicatorSize.label,
+            indicatorWeight: 3,
+            tabs: const [
+              Tab(text: 'Nhật ký'),
+              Tab(text: 'Y tế'),
             ],
           ),
         ),
@@ -55,35 +59,46 @@ class _DailyLogTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final logProvider = Provider.of<LogProvider>(context);
     final logs = logProvider.getLogsForPet(pet.id);
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
+      backgroundColor: colorScheme.surface,
       body: logs.isEmpty
-          ? const Center(child: Text('Chưa có hoạt động nào.', style: TextStyle(color: Colors.grey)))
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.history_edu_rounded, size: 48, color: colorScheme.outlineVariant),
+                  const SizedBox(height: 12),
+                  Text('Chưa có nhật ký', style: TextStyle(color: colorScheme.outline)),
+                ],
+              ),
+            )
           : ListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: logs.length,
               itemBuilder: (context, index) => _buildTimelineItem(context, logs[index]),
             ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.small(
         heroTag: 'add_log',
         onPressed: () => _showAddLogBottomSheet(context, logProvider),
-        backgroundColor: Colors.teal,
-        child: const Icon(Icons.add_comment, color: Colors.white),
+        child: const Icon(Icons.add_comment_rounded),
       ),
     );
   }
 
   Widget _buildTimelineItem(BuildContext context, DailyLogModel log) {
+    final colorScheme = Theme.of(context).colorScheme;
     IconData icon;
     Color color;
 
     switch (log.logType) {
       case 'Food':
-        icon = Icons.restaurant;
+        icon = Icons.restaurant_rounded;
         color = Colors.orange;
         break;
       case 'Waste':
-        icon = Icons.cleaning_services;
+        icon = Icons.cleaning_services_rounded;
         color = Colors.brown;
         break;
       case 'Symptom':
@@ -91,70 +106,83 @@ class _DailyLogTab extends StatelessWidget {
         color = Colors.red;
         break;
       default:
-        icon = Icons.info_outline;
-        color = Colors.blue;
+        icon = Icons.info_outline_rounded;
+        color = colorScheme.primary;
     }
 
-    return IntrinsicHeight(
-      child: Row(
-        children: [
-          Column(
-            children: [
-              Container(width: 2, height: 15, color: Colors.grey[300]),
-              Icon(icon, color: color, size: 24),
-              Expanded(child: Container(width: 2, color: Colors.grey[300])),
-            ],
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Card(
-              margin: const EdgeInsets.symmetric(vertical: 6),
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            log.title,
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            log.note,
-                            style: TextStyle(color: Colors.grey[800]),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          DateFormat('HH:mm\ndd/MM').format(log.dateTime),
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(fontSize: 11, color: Colors.grey),
-                        ),
-                        const SizedBox(height: 8),
-                        IconButton(
-                          constraints: const BoxConstraints(),
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.delete_outline, size: 20, color: Colors.redAccent),
-                          onPressed: () => _showDeleteLogConfirm(context, log),
-                        ),
-                      ],
-                    ),
-                  ],
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            Container(
+              width: 2,
+              height: 50,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [color.withOpacity(0.5), Colors.transparent],
                 ),
               ),
             ),
+          ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      log.title,
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    ),
+                    Text(
+                      DateFormat('HH:mm - dd/MM').format(log.dateTime),
+                      style: TextStyle(fontSize: 11, color: colorScheme.outline),
+                    ),
+                  ],
+                ),
+                if (log.note.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    log.note,
+                    style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
+                  ),
+                ],
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: Icon(Icons.delete_outline_rounded, size: 18, color: colorScheme.error),
+                    onPressed: () => _showDeleteLogConfirm(context, log),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

@@ -44,6 +44,10 @@ dependencies:
   image_picker: ^1.1.2
   intl: ^0.19.0
   uuid: ^4.3.3 # Dùng để tự sinh Unique ID cho các model
+  flutter_local_notifications: ^17.1.2
+  timezone: ^0.9.4
+  flutter_timezone: ^5.1.0
+  http: ^1.2.1
 
 dev_dependencies:
   flutter_test:

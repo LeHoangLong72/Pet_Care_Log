@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../models/daily_log_model.dart';
 import '../models/medical_model.dart';
+import '../services/notification_service.dart';
 
 class LogProvider extends ChangeNotifier {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -67,16 +68,37 @@ class LogProvider extends ChangeNotifier {
 
   Future<void> addMedical(MedicalModel medical) async {
     await _db.collection('medicals').doc(medical.id).set(medical.toMap());
+    
+    // Đặt thông báo nhắc nhở vào 8:00 sáng ngày hẹn tiếp theo
+    final reminderDate = DateTime(
+      medical.nextDueDate.year,
+      medical.nextDueDate.month,
+      medical.nextDueDate.day,
+      8, 0,
+    );
+
+    await NotificationService().scheduleNotification(
+      id: medical.id.hashCode,
+      title: 'Nhắc nhở chăm sóc thú cưng 🐾',
+      body: 'Hôm nay bé có lịch ${medical.type == 'Vaccine' ? 'tiêm phòng' : 'tẩy giun'} đó!',
+      scheduledDate: reminderDate,
+    );
   }
 
   Future<void> updateMedicalStatus(MedicalModel medical) async {
     await _db.collection('medicals').doc(medical.id).update({
       'isCompleted': medical.isCompleted,
     });
+    
+    // Nếu đã hoàn thành thì hủy thông báo nhắc nhở
+    if (medical.isCompleted) {
+      await NotificationService().cancelNotification(medical.id.hashCode);
+    }
   }
 
   Future<void> deleteMedical(String medicalId) async {
     await _db.collection('medicals').doc(medicalId).delete();
+    await NotificationService().cancelNotification(medicalId.hashCode);
   }
 
   @override

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:pet_care_log/providers/auth_provider.dart' as custom_auth;
 import 'package:pet_care_log/providers/pet_provider.dart';
 import 'package:pet_care_log/providers/log_provider.dart';
+import 'package:pet_care_log/services/notification_service.dart';
 import 'package:pet_care_log/views/auth/login_screen.dart';
 import 'package:pet_care_log/views/home/home_screen.dart';
 import 'package:provider/provider.dart';
@@ -14,6 +15,9 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  
+  // Khởi tạo thông báo
+  await NotificationService().init();
   
   // Tắt xác thực App để tránh bị treo reCAPTCHA trên máy ảo
   // (Chỉ hoạt động trên Android/iOS)
@@ -47,8 +51,49 @@ class MyApp extends StatelessWidget {
         title: 'PetCareLog',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: Colors.teal),
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: const Color(0xFF00695C), // Teal đậm
+            brightness: Brightness.light,
+          ),
           useMaterial3: true,
+          fontFamily: 'Roboto', // Font mặc định của Material
+          cardTheme: CardThemeData(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+              side: BorderSide(color: Colors.grey.shade200),
+            ),
+            color: Colors.white,
+          ),
+          appBarTheme: const AppBarTheme(
+            centerTitle: true,
+            scrolledUnderElevation: 0,
+
+            backgroundColor: Colors.transparent,
+          ),
+          floatingActionButtonTheme: FloatingActionButtonThemeData(
+            elevation: 2,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.grey.shade50,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: Color(0xFF00695C), width: 1.5),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          ),
         ),
         home: const AuthWrapper(),
       ),
