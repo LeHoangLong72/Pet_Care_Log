@@ -82,4 +82,16 @@ class AuthProvider extends ChangeNotifier {
   Future<void> signOut() async {
     await _auth.signOut();
   }
+
+  Future<String?> updateDisplayName(String newName) async {
+    try {
+      await _user?.updateDisplayName(newName);
+      await _user?.reload();
+      _user = _auth.currentUser;
+      notifyListeners();
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
 }

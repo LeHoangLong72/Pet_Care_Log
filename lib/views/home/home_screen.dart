@@ -7,6 +7,7 @@ import '../../providers/log_provider.dart';
 import '../../models/pet_model.dart';
 import '../../services/pet_api_service.dart';
 import '../profile/profile_screen.dart';
+import '../profile/user_profile_screen.dart';
 import '../timeline/timeline_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,6 +19,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _petFact = "Đang tải kiến thức thú cưng...";
+  bool _isLoadingFact = false;
   final PetApiService _apiService = PetApiService();
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = "";
@@ -35,10 +37,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadFact() async {
+    if (mounted) setState(() => _isLoadingFact = true);
     final fact = await _apiService.getRandomPetFact();
     if (mounted) {
       setState(() {
         _petFact = fact;
+        _isLoadingFact = false;
       });
     }
   }
@@ -63,12 +67,6 @@ class _HomeScreenState extends State<HomeScreen> {
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout_rounded, color: Color(0xFF00695C)),
-            onPressed: () => authProvider.signOut(),
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -163,7 +161,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 8),
-          Text(_petFact, style: const TextStyle(fontSize: 13, color: Colors.black87, fontStyle: FontStyle.italic)),
+          _isLoadingFact 
+            ? const Center(child: Padding(
+                padding: EdgeInsets.all(8.0),
+                child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+              ))
+            : Text(_petFact, style: const TextStyle(fontSize: 13, color: Colors.black87, fontStyle: FontStyle.italic)),
         ],
       ),
     );

@@ -6,25 +6,25 @@ import 'package:pet_care_log/providers/pet_provider.dart';
 import 'package:pet_care_log/providers/log_provider.dart';
 import 'package:pet_care_log/services/notification_service.dart';
 import 'package:pet_care_log/views/auth/login_screen.dart';
-import 'package:pet_care_log/views/home/home_screen.dart';
+import 'package:pet_care_log/views/navigation/main_navigation_screen.dart';
 import 'package:provider/provider.dart';
 import 'firebase_options.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // Khởi chạy Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // Khởi tạo thông báo
-  await NotificationService().init();
+  // Khởi tạo các dịch vụ khác một cách không đồng bộ để không chặn luồng chính quá lâu
+  NotificationService().init();
   
-  // Tắt xác thực App để tránh bị treo reCAPTCHA trên máy ảo
-  // (Chỉ hoạt động trên Android/iOS)
   try {
-    await FirebaseAuth.instance.setSettings(appVerificationDisabledForTesting: true);
+    FirebaseAuth.instance.setSettings(appVerificationDisabledForTesting: true);
   } catch (e) {
-    debugPrint("Lỗi cấu hình xác thực: $e");
+    debugPrint("Lỗi cấu hình: $e");
   }
 
   runApp(const MyApp());
@@ -109,7 +109,7 @@ class AuthWrapper extends StatelessWidget {
     final authProvider = Provider.of<custom_auth.AuthProvider>(context);
     
     if (authProvider.isAuthenticated) {
-      return const HomeScreen();
+      return const MainNavigationScreen();
     } else {
       return const LoginScreen();
     }
