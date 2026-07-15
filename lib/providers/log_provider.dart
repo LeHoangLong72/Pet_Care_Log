@@ -69,19 +69,14 @@ class LogProvider extends ChangeNotifier {
   Future<void> addMedical(MedicalModel medical) async {
     await _db.collection('medicals').doc(medical.id).set(medical.toMap());
     
-    // Đặt thông báo nhắc nhở vào 8:00 sáng ngày hẹn tiếp theo
-    final reminderDate = DateTime(
-      medical.nextDueDate.year,
-      medical.nextDueDate.month,
-      medical.nextDueDate.day,
-      8, 0,
-    );
+    // ĐỂ TEST: Thông báo sẽ hiện sau 5 giây kể từ khi bấm Lưu
+    final testDate = DateTime.now().add(const Duration(seconds: 5));
 
     await NotificationService().scheduleNotification(
       id: medical.id.hashCode,
       title: 'Nhắc nhở chăm sóc thú cưng 🐾',
-      body: 'Hôm nay bé có lịch ${medical.type == 'Vaccine' ? 'tiêm phòng' : 'tẩy giun'} đó!',
-      scheduledDate: reminderDate,
+      body: 'Đã đến lịch ${medical.type == 'Vaccine' ? 'tiêm phòng' : 'tẩy giun'} cho bé rồi!',
+      scheduledDate: testDate,
     );
   }
 

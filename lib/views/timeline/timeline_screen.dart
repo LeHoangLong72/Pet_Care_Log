@@ -17,6 +17,7 @@ class TimelineScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     // Lấy thông tin Pet để có ownerId
     final pet = Provider.of<PetProvider>(context).pets.firstWhere((p) => p.id == petId);
+    final logProvider = Provider.of<LogProvider>(context, listen: false);
 
     return DefaultTabController(
       length: 2,
@@ -28,6 +29,22 @@ class TimelineScreen extends StatelessWidget {
               Text(pet.breed, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.outline)),
             ],
           ),
+          actions: [
+            Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.add_circle_outline_rounded, size: 28),
+                onPressed: () {
+                  final index = DefaultTabController.of(context).index;
+                  if (index == 0) {
+                    _DailyLogTab.showAddLog(context, pet, logProvider);
+                  } else {
+                    _MedicalTab.showAddMedical(context, pet, logProvider);
+                  }
+                },
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
           bottom: TabBar(
             labelColor: Theme.of(context).colorScheme.primary,
             unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -79,10 +96,61 @@ class _DailyLogTab extends StatelessWidget {
               itemCount: logs.length,
               itemBuilder: (context, index) => _buildTimelineItem(context, logs[index]),
             ),
-      floatingActionButton: FloatingActionButton.small(
-        heroTag: 'add_log',
-        onPressed: () => _showAddLogBottomSheet(context, logProvider),
-        child: const Icon(Icons.add_comment_rounded),
+    );
+  }
+
+  static void showAddLog(BuildContext context, PetModel pet, LogProvider provider) {
+    final titleController = TextEditingController();
+    final noteController = TextEditingController();
+    String selectedType = 'Food';
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 16, right: 16, top: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Ghi chép hoạt động', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 15),
+              DropdownButtonFormField<String>(
+                value: selectedType,
+                items: const [
+                  DropdownMenuItem(value: 'Food', child: Text('Ăn uống')),
+                  DropdownMenuItem(value: 'Waste', child: Text('Vệ sinh')),
+                  DropdownMenuItem(value: 'Symptom', child: Text('Triệu chứng lạ')),
+                ],
+                onChanged: (val) => setModalState(() => selectedType = val!),
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Loại hoạt động'),
+              ),
+              const SizedBox(height: 10),
+              TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Tiêu đề (VD: Ăn hạt)')),
+              TextField(controller: noteController, decoration: const InputDecoration(labelText: 'Ghi chú')),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  if (titleController.text.isNotEmpty) {
+                    provider.addLog(DailyLogModel(
+                      id: const Uuid().v4(),
+                      petId: pet.id,
+                      ownerId: pet.ownerId,
+                      dateTime: DateTime.now(),
+                      logType: selectedType,
+                      title: titleController.text,
+                      note: noteController.text,
+                    ));
+                    Navigator.pop(context);
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00695C), minimumSize: const Size(double.infinity, 45)),
+                child: const Text('LƯU NHẬT KÝ', style: TextStyle(color: Colors.white)),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -334,11 +402,99 @@ class _MedicalTab extends StatelessWidget {
                 );
               },
             ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'add_medical',
-        onPressed: () => _showAddMedicalDialog(context, logProvider),
-        backgroundColor: Colors.teal,
-        child: const Icon(Icons.add_moderator, color: Colors.white),
+    );
+  }
+
+  static void showAddMedical(BuildContext context, PetModel pet, LogProvider provider) {
+    String selectedType = 'Vaccine';
+    DateTime adminDate = DateTime.now();
+    DateTime nextDate = DateTime.now().add(const Duration(days: 365));
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => Padding(
+          padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom, left: 16, right: 16, top: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Thêm bản ghi y tế', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 15),
+              DropdownButtonFormField<String>(
+                value: selectedType,
+                items: const [
+                  DropdownMenuItem(value: 'Vaccine', child: Text('Tiêm phòng')),
+                  DropdownMenuItem(value: 'Deworming', child: Text('Tẩy giun')),
+                ],
+                onChanged: (val) {
+                  setModalState(() {
+                    selectedType = val!;
+                    if (selectedType == 'Vaccine') {
+                      nextDate = adminDate.add(const Duration(days: 365));
+                    } else {
+                      nextDate = adminDate.add(const Duration(days: 90));
+                    }
+                  });
+                },
+                decoration: const InputDecoration(border: OutlineInputBorder(), labelText: 'Loại dịch vụ'),
+              ),
+              const SizedBox(height: 10),
+              ListTile(
+                title: const Text('Ngày thực hiện'),
+                subtitle: Text(DateFormat('dd/MM/yyyy').format(adminDate)),
+                trailing: const Icon(Icons.calendar_today),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: adminDate,
+                    firstDate: DateTime(2020),
+                    lastDate: DateTime.now(),
+                  );
+                  if (picked != null) {
+                    setModalState(() => adminDate = picked);
+                  }
+                },
+              ),
+              ListTile(
+                title: const Text('Ngày hẹn tiếp theo'),
+                subtitle: Text(DateFormat('dd/MM/yyyy').format(nextDate)),
+                trailing: const Icon(Icons.calendar_today, color: Colors.orange),
+                onTap: () async {
+                  final picked = await showDatePicker(
+                    context: context,
+                    initialDate: nextDate,
+                    firstDate: adminDate,
+                    lastDate: DateTime(2100),
+                  );
+                  if (picked != null) {
+                    setModalState(() => nextDate = picked);
+                  }
+                },
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  provider.addMedical(MedicalModel(
+                    id: const Uuid().v4(),
+                    petId: pet.id,
+                    ownerId: pet.ownerId,
+                    type: selectedType,
+                    dateAdministered: adminDate,
+                    nextDueDate: nextDate,
+                    isCompleted: adminDate.day == DateTime.now().day && 
+                               adminDate.month == DateTime.now().month &&
+                               adminDate.year == DateTime.now().year,
+                  ));
+                  Navigator.pop(context);
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF00695C), minimumSize: const Size(double.infinity, 45)),
+                child: const Text('LƯU THÔNG TIN', style: TextStyle(color: Colors.white)),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
       ),
     );
   }

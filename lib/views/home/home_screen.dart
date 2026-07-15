@@ -61,12 +61,20 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: const Color(0xFFF5F7FA), // Màu nền sáng nhẹ để nổi bật Search Bar
       appBar: AppBar(
         title: const Text(
-          'PetCareLog 🐾',
+          'Pet Care Log 🐾',
           style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00695C)),
         ),
         centerTitle: true,
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen())),
+            icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF00695C), size: 28),
+            tooltip: 'Thêm thú cưng',
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Column(
         children: [
@@ -124,13 +132,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
           ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen())),
-        icon: const Icon(Icons.add_rounded),
-        label: const Text('Thêm thú cưng'),
-        backgroundColor: const Color(0xFF00695C),
-        foregroundColor: Colors.white,
       ),
     );
   }
